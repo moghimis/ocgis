@@ -4,6 +4,11 @@ from collections import deque
 
 import numpy as np
 import six
+from shapely.geometry import Point, Polygon
+from shapely.geometry.base import BaseGeometry, BaseMultipartGeometry
+from shapely.geometry.linestring import LineString
+from shapely.geometry.multipolygon import MultiPolygon
+
 from ocgis import env, vm
 from ocgis.base import raise_if_empty, is_unstructured_driver
 from ocgis.constants import KeywordArgument, GridAbstraction, VariableName, AttributeName, GridChunkerConstants, \
@@ -16,10 +21,6 @@ from ocgis.variable.base import get_dslice, Variable
 from ocgis.variable.dimension import create_distributed_dimension
 from ocgis.variable.geom import GeometryProcessor, GeometryVariable
 from ocgis.vmachine.mpi import cancel_free_requests
-from shapely.geometry import Point, Polygon
-from shapely.geometry.base import BaseGeometry, BaseMultipartGeometry
-from shapely.geometry.linestring import LineString
-from shapely.geometry.multipolygon import MultiPolygon
 
 
 def format_gridunstruct_return(func):
@@ -360,12 +361,13 @@ class AbstractGeometryCoordinates(AbstractXYZSpatialContainer):
                 mask_value = np.logical_or(mask_value, hint_mask)
 
         has_mask = self.has_mask
+        has_masked_values = self.has_masked_values_global
         has_z = self.has_z
         get_shapely_geometry = self.get_shapely_geometry
         get_element_node_connectivity_by_index = self.get_element_node_connectivity_by_index
         start_index = self.start_index
         for idx in range(len(self.element_dim)):
-            if use_mask and has_mask:
+            if use_mask and has_mask and has_masked_values:
                 is_masked = mask_value[idx]
             else:
                 is_masked = False
@@ -742,7 +744,8 @@ class PolygonGC(AbstractGeometryCoordinates):
     def get_element_node_connectivity_by_index(self, element_connectivity, idx):
         # TODO: OPTIMIZE: Driver-specific method to load polygon coordinate indices.
         # ESMF unstructured uses counts...
-        if self.dimension_map.get_driver() == DriverKey.NETCDF_ESMF_UNSTRUCT:
+        if False: #tdk:debug
+        # if self.dimension_map.get_driver() == DriverKey.NETCDF_ESMF_UNSTRUCT: #tdk:debug
             num_element_conn_value = self.parent['numElementConn'].get_value()
             if idx == 0:
                 start = 0
@@ -750,11 +753,14 @@ class PolygonGC(AbstractGeometryCoordinates):
                 start = num_element_conn_value[0:idx].sum()
             stop = num_element_conn_value[0:idx + 1].sum()
             ret = element_connectivity[start:stop]
+            if ret.shape[0] < 1:
+                import ipdb;ipdb.set_trace() #tdk:rm
+                exc = ValueError("element connectivity returning zero corners")
+                vm.abort(exc=exc)
         else:
             ret = element_connectivity[idx, ...].flatten()
             if element_connectivity.dtype == object:
                 ret = ret[0].flatten()
-        # TODO: /OPTIMIZE
         return ret
 
     def get_shapely_geometry(self, *args, **kwargs):

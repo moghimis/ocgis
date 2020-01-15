@@ -3,11 +3,17 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import numpy as np
-import ocgis
 import shapely
 from mock import mock
 from nose.plugins.skip import SkipTest
 from numpy.ma import MaskedArray
+from shapely import wkt
+from shapely.geometry import Point, box, MultiPoint, LineString, Polygon
+from shapely.geometry.base import BaseMultipartGeometry
+from shapely.geometry.multilinestring import MultiLineString
+from shapely.geometry.multipolygon import MultiPolygon
+
+import ocgis
 from ocgis import RequestDataset, vm, Field
 from ocgis import env, CoordinateReferenceSystem
 from ocgis.constants import DMK, WrappedState, OcgisConvention, DriverKey
@@ -21,11 +27,6 @@ from ocgis.variable.dimension import Dimension
 from ocgis.variable.geom import GeometryVariable, GeometryProcessor, get_split_polygon_by_node_threshold, \
     GeometrySplitter
 from ocgis.vmachine.mpi import OcgDist, MPI_RANK, variable_scatter, MPI_SIZE, variable_gather, MPI_COMM
-from shapely import wkt
-from shapely.geometry import Point, box, MultiPoint, LineString, Polygon
-from shapely.geometry.base import BaseMultipartGeometry
-from shapely.geometry.multilinestring import MultiLineString
-from shapely.geometry.multipolygon import MultiPolygon
 
 
 class TestGeometryProcessor(AbstractTestInterface):
@@ -800,6 +801,7 @@ class TestGeometryVariable(AbstractTestInterface, FixturePolygonWithHole):
                                 wrapped_state=WrappedState.UNWRAPPED)
 
         for _ in range(3):
+            print("current: {}".format(_))
             prepared = gvar.prepare()
             self.assertNotEqual(id(prepared), id(gvar))
             actual = []

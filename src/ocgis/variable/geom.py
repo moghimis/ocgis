@@ -407,6 +407,8 @@ class GeometryVariable(AbstractSpatialVariable):
         else:
             is_multi = False
 
+        # Problematic indices in the conversion. These may be removed if allow_splitting_excs is true.
+        removed_indices = []
         if target == ConversionTarget.GEOMETRY_COORDS:
             if use_geometry_iterator:
                 has_z_itr = self._request_dataset.driver.get_variable_value(self, as_geometry_iterator=True)
@@ -455,7 +457,6 @@ class GeometryVariable(AbstractSpatialVariable):
                 if to_crs is not None:
                     from_crs = self._request_dataset.crs
 
-                removed_indices = []
                 for idx, geom in enumerate(geom_itr):
                     if to_crs is not None:
                         to_transform = GeometryVariable.from_shapely(geom, crs=from_crs)
