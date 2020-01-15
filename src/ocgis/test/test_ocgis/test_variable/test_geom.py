@@ -801,7 +801,6 @@ class TestGeometryVariable(AbstractTestInterface, FixturePolygonWithHole):
                                 wrapped_state=WrappedState.UNWRAPPED)
 
         for _ in range(3):
-            print("current: {}".format(_))
             prepared = gvar.prepare()
             self.assertNotEqual(id(prepared), id(gvar))
             actual = []
@@ -811,42 +810,33 @@ class TestGeometryVariable(AbstractTestInterface, FixturePolygonWithHole):
             self.assertEqual(actual, desired)
 
         # Test updating the coordinate system.
-        update_crs_call_count = {WGS84: 1, Spherical: 0, None: 1}
-        wrapped_state = [None, WrappedState.WRAPPED, WrappedState.UNWRAPPED, WrappedState.UNKNOWN]
-        keywords = dict(archetype_crs=update_crs_call_count.keys(), wrapped_state=wrapped_state)
+        updated_crs = [WGS84, Spherical, None]
+        wrapped_states = [None, WrappedState.WRAPPED, WrappedState.UNWRAPPED, WrappedState.UNKNOWN]
+        keywords = dict(wrapped_state_src=wrapped_states,
+                        wrapped_state_dst=wrapped_states,
+                        crs_src=updated_crs,
+                        crs_dst=updated_crs)
         for k in self.iter_product_keywords(keywords):
             dgvar = deepcopy(gvar)
-            dgvar.update_crs = mock.Mock()
-            dgvar.deepcopy = mock.Mock(return_value=dgvar)
-            dgvar.copy = mock.Mock()
-            archetype = mock.create_autospec(GeometryVariable, spec_set=True)
-            archetype.wrapped_state = k.wrapped_state
-            try:
-                archetype.crs = k.archetype_crs()
-                archetype.crs.wrap_or_unwrap = mock.Mock()
-            except TypeError:
-                archetype.crs = None
-            _ = dgvar.prepare(archetype=archetype)
-            desired_count = update_crs_call_count[k.archetype_crs]
-            self.assertEqual(dgvar.update_crs.call_count, desired_count)
-            if desired_count > 0:
-                dgvar.update_crs.assert_called_once_with(archetype.crs)
-            if k.archetype_crs is not None and k.wrapped_state not in (WrappedState.UNKNOWN, None):
-                archetype.crs.wrap_or_unwrap.assert_called_once_with(archetype.wrapped_state, dgvar)
+            dgvar.wrapped_state = k.wrapped_state_src
+            if k.crs_src is None:
+                dgvar.crs = None
             else:
-                if k.archetype_crs is not None:
-                    archetype.crs.wrap_or_unwrap.assert_not_called()
-            dgvar.deepcopy.assert_called_once()
-            dgvar.copy.assert_not_called()
+                dgvar.crs = k.crs_src()
+            archetype = deepcopy(gvar)
+            archetype.wrapped_state = k.wrapped_state_dst
+            if k.crs_dst is None:
+                archetype.crs = None
+            else:
+                archetype.crs = k.crs_dst()
+            actual = dgvar.prepare(archetype=archetype)
 
         # Test identical object is returned if nothing happens.
-        gvar = GeometryVariable()
-        gvar.deepcopy = mock.Mock(spec=GeometryVariable.deepcopy)
-        gvar.copy = mock.Mock(spec=GeometryVariable.copy)
-        actual = gvar.prepare()
-        self.assertNotEqual(id(actual), id(gvar))
-        gvar.deepcopy.assert_not_called()
-        gvar.copy.assert_called_once()
+        dgvar = deepcopy(gvar)
+        dgvar.crs = None
+        actual = dgvar.prepare()
+        self.assertNotEqual(id(actual), id(dgvar))
+        self.assertEqual(id(dgvar.v()[0]), id(actual.v()[0]))
 
         # Test exception for more than one geometry.
         gvar = mock.create_autospec(GeometryVariable, spec_set=True)

@@ -1072,46 +1072,82 @@ class GeometryVariable(AbstractSpatialVariable):
         crs = self.crs
         dced = False
         ret = self.copy()
+        if archetype is not None:
+            crs_dst = archetype.crs
+            wrapped_state_archetype = archetype.wrapped_state
+        else:
+            crs_dst, wrapped_state_archetype = None, None
+
+        if crs is not None and crs_dst is not None and crs_dst != crs:
+            if not dced:
+                ret = self.deepcopy()
+                dced = True
+            ret.update_crs(crs_dst)
+
+        if crs_dst is not None and crs_dst.is_wrappable and wrapped_state_archetype not in (WrappedState.UNKNOWN, None):
+            ret_wrapped_state = ret.wrapped_state
+            if ret_wrapped_state not in (WrappedState.UNKNOWN, None):
+                if wrapped_state_archetype != ret_wrapped_state:
+                    if wrapped_state_archetype == WrappedState.WRAPPED and ret_wrapped_state == WrappedState.UNWRAPPED:
+                        action = WrapAction.WRAP
+                    elif wrapped_state_archetype == WrappedState.UNWRAPPED and ret_wrapped_state == WrappedState.WRAPPED:
+                        action = WrapAction.UNWRAP
+                    else:
+                        exc = ValueError("wrap action combination not supported")
+                        vm.abort(exc=exc)
+                    if not dced:
+                        ret = ret.deepcopy()
+                        dced = True
+                    crs_dst.wrap_or_unwrap(action, ret)
+
+        # Update the geometry variable for subsetting
+        if ret.crs is not None:
+            if not dced:
+                ret = self.deepcopy()
+                dced = True
+            ret = ret.crs.prepare_geometry_variable(ret)
+
+        # tdk:todo: removing any setting of the wrapped state explicitly by ocgis. this should be a user switch
         # Reset the wrapped state on the geometry as coordinates may be modified during preparation. This could be
         # optimized to maintain the wrapped state after preparation.
-        self._wrapped_state = "auto"
-        self_wrapped_state = self.wrapped_state
-        if crs is not None or archetype is not None:
-            # Update the coordinate system if it differs from the archetype.
-            if archetype is not None:
-                acrs = archetype.crs
-                if acrs is not None and acrs != crs:
-                    if not dced:
-                        ret = self.deepcopy()
-                        dced = True
-                    ret.update_crs(acrs)
-
-                # Update spatial wrapping if it is still applicable.
-                if acrs is not None:
-                    archetype_wrapped_state = archetype.wrapped_state
-                    if archetype_wrapped_state not in (WrappedState.UNKNOWN, None):
-                        if archetype_wrapped_state != self_wrapped_state:
-                            if archetype_wrapped_state == WrappedState.WRAPPED and self_wrapped_state == WrappedState.UNWRAPPED:
-                                action = WrapAction.WRAP
-                            elif archetype_wrapped_state == WrappedState.UNWRAPPED and self_wrapped_state == WrappedState.WRAPPED:
-                                action = WrapAction.UNWRAP
-                            else:
-                                exc = ValueError("wrap action combination not supported")
-                                try:
-                                    raise exc
-                                finally:
-                                    vm.abort(exc=exc)
-                            if not dced:
-                                ret = self.deepcopy()
-                                dced = True
-                            acrs.wrap_or_unwrap(action, ret)
-
-                # Update the geometry variable for subsetting
-                if crs is not None:
-                    if not dced:
-                        ret = self.deepcopy()
-                        dced = True
-                    ret = crs.prepare_geometry_variable(ret)
+        # self._wrapped_state = "auto" #tdk:rm
+        # if crs is not None or archetype is not None:
+        #     self_wrapped_state = self.wrapped_state
+        #     # Update the coordinate system if it differs from the archetype.
+        #     if archetype is not None:
+        #         acrs = archetype.crs
+        #         if acrs is not None and acrs != crs:
+        #             if not dced:
+        #                 ret = self.deepcopy()
+        #                 dced = True
+        #             ret.update_crs(acrs)
+        #
+        #         # Update spatial wrapping if it is still applicable.
+        #         if acrs is not None:
+        #             archetype_wrapped_state = archetype.wrapped_state
+        #             if archetype_wrapped_state not in (WrappedState.UNKNOWN, None):
+        #                 if archetype_wrapped_state != self_wrapped_state:
+        #                     if archetype_wrapped_state == WrappedState.WRAPPED and self_wrapped_state == WrappedState.UNWRAPPED:
+        #                         action = WrapAction.WRAP
+        #                     elif archetype_wrapped_state == WrappedState.UNWRAPPED and self_wrapped_state == WrappedState.WRAPPED:
+        #                         action = WrapAction.UNWRAP
+        #                     else:
+        #                         exc = ValueError("wrap action combination not supported")
+        #                         try:
+        #                             raise exc
+        #                         finally:
+        #                             vm.abort(exc=exc)
+        #                     if not dced:
+        #                         ret = self.deepcopy()
+        #                         dced = True
+        #                     acrs.wrap_or_unwrap(action, ret)
+        #
+        #         # Update the geometry variable for subsetting
+        #         if crs is not None:
+        #             if not dced:
+        #                 ret = self.deepcopy()
+        #                 dced = True
+        #             ret = crs.prepare_geometry_variable(ret)
 
         return ret
 
