@@ -811,25 +811,32 @@ class TestGeometryVariable(AbstractTestInterface, FixturePolygonWithHole):
 
         # Test updating the coordinate system.
         updated_crs = [WGS84, Spherical, None]
-        wrapped_states = [None, WrappedState.WRAPPED, WrappedState.UNWRAPPED, WrappedState.UNKNOWN]
+        wrapped_states = [WrappedState.WRAPPED, WrappedState.UNWRAPPED, WrappedState.UNKNOWN]
         keywords = dict(wrapped_state_src=wrapped_states,
                         wrapped_state_dst=wrapped_states,
                         crs_src=updated_crs,
                         crs_dst=updated_crs)
-        for k in self.iter_product_keywords(keywords):
+        for ctr, k in enumerate(self.iter_product_keywords(keywords)):
             dgvar = deepcopy(gvar)
             dgvar.wrapped_state = k.wrapped_state_src
             if k.crs_src is None:
                 dgvar.crs = None
             else:
                 dgvar.crs = k.crs_src()
+
             archetype = deepcopy(gvar)
             archetype.wrapped_state = k.wrapped_state_dst
             if k.crs_dst is None:
                 archetype.crs = None
             else:
                 archetype.crs = k.crs_dst()
+
             actual = dgvar.prepare(archetype=archetype)
+
+            if k.crs_src is not None and k.crs_dst is not None:
+                self.assertEqual(actual.crs, archetype.crs)
+                if dgvar.wrapped_state not in (WrappedState.UNKNOWN,) and archetype.wrapped_state not in (WrappedState.UNKNOWN,):
+                    self.assertEqual(actual.wrapped_state, archetype.wrapped_state)
 
         # Test identical object is returned if nothing happens.
         dgvar = deepcopy(gvar)

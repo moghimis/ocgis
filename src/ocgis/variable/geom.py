@@ -1084,7 +1084,7 @@ class GeometryVariable(AbstractSpatialVariable):
                 dced = True
             ret.update_crs(crs_dst)
 
-        if crs_dst is not None and crs_dst.is_wrappable and wrapped_state_archetype not in (WrappedState.UNKNOWN, None):
+        if crs_dst is not None and wrapped_state_archetype not in (WrappedState.UNKNOWN, None):
             ret_wrapped_state = ret.wrapped_state
             if ret_wrapped_state not in (WrappedState.UNKNOWN, None):
                 if wrapped_state_archetype != ret_wrapped_state:
@@ -1103,7 +1103,7 @@ class GeometryVariable(AbstractSpatialVariable):
         # Update the geometry variable for subsetting
         if ret.crs is not None:
             if not dced:
-                ret = self.deepcopy()
+                ret = ret.deepcopy()
                 dced = True
             ret = ret.crs.prepare_geometry_variable(ret)
 
